@@ -1,108 +1,13 @@
-# Prometheus [![Build Status](https://travis-ci.org/prometheus/prometheus.svg)][travis]
+# Prometheus 源码注释
 
-[![CircleCI](https://circleci.com/gh/prometheus/prometheus/tree/master.svg?style=shield)][circleci]
-[![Docker Repository on Quay](https://quay.io/repository/prometheus/prometheus/status)][quay]
-[![Docker Pulls](https://img.shields.io/docker/pulls/prom/prometheus.svg?maxAge=604800)][hub]
-[![Go Report Card](https://goreportcard.com/badge/github.com/prometheus/prometheus)](https://goreportcard.com/report/github.com/prometheus/prometheus)
-[![Code Climate](https://codeclimate.com/github/prometheus/prometheus/badges/gpa.svg)](https://codeclimate.com/github/prometheus/prometheus)
-[![Issue Count](https://codeclimate.com/github/prometheus/prometheus/badges/issue_count.svg)](https://codeclimate.com/github/prometheus/prometheus)
+本项目是[Prometheus](https://github.com/prometheus/prometheus)的fork项目，灵感源自于huangz1990同学的[redis3.0源码注释](https://github.com/huangz1990/redis-3.0-annotated)项目，旨在通过添加一些代码的注释，给更多的人提供一些学习和深入Prometheus监控系统的资料。
 
-Visit [prometheus.io](https://prometheus.io) for the full documentation,
-examples and guides.
+## PR要求
 
-Prometheus, a [Cloud Native Computing Foundation](https://cncf.io/) project, is a systems and service monitoring system. It collects metrics
-from configured targets at given intervals, evaluates rule expressions,
-displays the results, and can trigger alerts if some condition is observed
-to be true.
+本次注释是基于Prometheus v1.6.3的源码，对应切出的分支是`v1.6.3-annotated`，**不允许任何源码内容方面的改动**，需要链接介绍或详细解释等博客文章，请在注释里添加对应的链接。
 
-Prometheus' main distinguishing features as compared to other monitoring systems are:
+最后，为互联网的分享和自由精神干杯!
 
-- a **multi-dimensional** data model (timeseries defined by metric name and set of key/value dimensions)
-- a **flexible query language** to leverage this dimensionality
-- no dependency on distributed storage; **single server nodes are autonomous**
-- timeseries collection happens via a **pull model** over HTTP
-- **pushing timeseries** is supported via an intermediary gateway
-- targets are discovered via **service discovery** or **static configuration**
-- multiple modes of **graphing and dashboarding support**
-- support for hierarchical and horizontal **federation**
+Colstuwjx
 
-## Architecture overview
-
-![](https://cdn.rawgit.com/prometheus/prometheus/c34257d069c630685da35bcef084632ffd5d6209/documentation/images/architecture.svg)
-
-## Install
-
-There are various ways of installing Prometheus.
-
-### Precompiled binaries
-
-Precompiled binaries for released versions are available in the
-[*download* section](https://prometheus.io/download/)
-on [prometheus.io](https://prometheus.io). Using the latest production release binary
-is the recommended way of installing Prometheus.
-See the [Installing](https://prometheus.io/docs/introduction/install/)
-chapter in the documentation for all the details.
-
-Debian packages [are available](https://packages.debian.org/sid/net/prometheus).
-
-### Docker images
-
-Docker images are available on [Quay.io](https://quay.io/repository/prometheus/prometheus).
-
-You can launch a Prometheus container for trying it out with
-
-    $ docker run --name prometheus -d -p 127.0.0.1:9090:9090 quay.io/prometheus/prometheus
-
-Prometheus will now be reachable at http://localhost:9090/.
-
-### Building from source
-
-To build Prometheus from the source code yourself you need to have a working
-Go environment with [version 1.5 or greater installed](http://golang.org/doc/install).
-
-You can directly use the `go` tool to download and install the `prometheus`
-and `promtool` binaries into your `GOPATH`. We use Go 1.5's experimental
-vendoring feature, so you will also need to set the `GO15VENDOREXPERIMENT=1`
-environment variable in this case:
-
-    $ GO15VENDOREXPERIMENT=1 go get github.com/prometheus/prometheus/cmd/...
-    $ prometheus -config.file=your_config.yml
-
-You can also clone the repository yourself and build using `make`:
-
-    $ mkdir -p $GOPATH/src/github.com/prometheus
-    $ cd $GOPATH/src/github.com/prometheus
-    $ git clone https://github.com/prometheus/prometheus.git
-    $ cd prometheus
-    $ make build
-    $ ./prometheus -config.file=your_config.yml
-
-The Makefile provides several targets:
-
-  * *build*: build the `prometheus` and `promtool` binaries
-  * *test*: run the tests
-  * *test-short*: run the short tests
-  * *format*: format the source code
-  * *vet*: check the source code for common errors
-  * *assets*: rebuild the static assets
-  * *docker*: build a docker container for the current `HEAD`
-
-## More information
-
-  * The source code is periodically indexed: [Prometheus Core](http://godoc.org/github.com/prometheus/prometheus).
-  * You will find a Travis CI configuration in `.travis.yml`.
-  * See the [Community page](https://prometheus.io/community) for how to reach the Prometheus developers and users on various communication channels.
-
-## Contributing
-
-Refer to [CONTRIBUTING.md](https://github.com/prometheus/prometheus/blob/master/CONTRIBUTING.md)
-
-## License
-
-Apache License 2.0, see [LICENSE](https://github.com/prometheus/prometheus/blob/master/LICENSE).
-
-
-[travis]: https://travis-ci.org/prometheus/prometheus
-[hub]: https://hub.docker.com/r/prom/prometheus/
-[circleci]: https://circleci.com/gh/prometheus/prometheus
-[quay]: https://quay.io/repository/prometheus/prometheus
+2017.05.28
