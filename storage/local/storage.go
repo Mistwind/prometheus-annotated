@@ -34,6 +34,29 @@ import (
 	"github.com/prometheus/prometheus/storage/metric"
 )
 
+/*
+	TODO: fill out the glossary.
+
+	术语表:
+	Create
+	Evict
+	Quarantine
+	FingerPrint
+	Chunk
+	HeadChunk
+	Series
+	UrgencyScore
+	Rushed Mode
+	SyncStrategy
+	CheckPoint
+	DirtySeries
+	TargetHeapSize
+	MinShrinkRatio
+	Throttling
+	Compaction
+	CrashRecovery
+*/
+
 const (
 	evictRequestsCap      = 1024
 	quarantineRequestsCap = 1024
