@@ -152,7 +152,8 @@ func Main() int {
 		SampleAppender: sampleAppender,
 		Notifier:       notifier,
 		QueryEngine:    queryEngine,
-		Context:        fanin.WithLocalOnly(ctx),
+		// 注意：这里加上了WithLocalOnly，因此rule的执行器是只关注本地存储的数据!
+		Context: fanin.WithLocalOnly(ctx),
 		// 重载alertmanager的url为指定的外部链接，解决alertmanager本身部署在反向代理后面的访问情况
 		// 参见：https://github.com/prometheus/alertmanager/issues/95
 		ExternalURL: cfg.web.ExternalURL,

@@ -65,6 +65,8 @@ type recoverableError struct {
 }
 
 // Store sends a batch of samples to the HTTP endpoint.
+// Store方法会将采集到的一个batch的监控sample数据POST给配置好的Endpoint列表
+// POST的数据协议是：x-protobuf，并使用snappy作为编码
 func (c *Client) Store(samples model.Samples) error {
 	req := &WriteRequest{
 		Timeseries: make([]*TimeSeries, 0, len(samples)),

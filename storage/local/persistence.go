@@ -149,6 +149,7 @@ func newPersistence(
 	dirtyPath := filepath.Join(basePath, dirtyFileName)
 	versionPath := filepath.Join(basePath, versionFileName)
 
+	// 版本有效性和兼容性检查
 	if versionData, err := ioutil.ReadFile(versionPath); err == nil {
 		if persistedVersion, err := strconv.Atoi(strings.TrimSpace(string(versionData))); err != nil {
 			return nil, fmt.Errorf("cannot parse content of %s: %s", versionPath, versionData)
@@ -195,15 +196,19 @@ func newPersistence(
 		return nil, err
 	}
 
+	// 获取对脏写文件的锁，如果无法获取，可能Prometheus正在运行或者没有关闭，抛出错误
 	fLock, dirtyfileExisted, err := flock.New(dirtyPath)
 	if err != nil {
 		log.Errorf("Could not lock %s, Prometheus already running?", dirtyPath)
 		return nil, err
 	}
+	// 已经有脏写文件存在
 	if dirtyfileExisted {
 		dirty = true
 	}
 
+	// 针对现有已经落地的数据，依托LevelDB生成对应的metrics索引（根据metrics kv来索引的）
+	// 如果遇到问题，抛出错误让用户修复LevelDB索引或者丢弃现有归档数据，清空重来.
 	archivedFingerprintToMetrics, err := index.NewFingerprintMetricIndex(basePath)
 	if err != nil {
 		// At this point, we could simply blow away the archived
@@ -213,14 +218,17 @@ func newPersistence(
 		log.Errorf("Could not open the fingerprint-to-metric index for archived series. Please try a 3rd party tool to repair LevelDB in directory %q. If unsuccessful or undesired, delete the whole directory and restart Prometheus for crash recovery. You will lose all archived time series.", filepath.Join(basePath, index.FingerprintToMetricDir))
 		return nil, err
 	}
+	// 类似地，依托LevelDB生成基于时间戳的索引.
 	archivedFingerprintToTimeRange, err := index.NewFingerprintTimeRangeIndex(basePath)
 	if err != nil {
 		// We can recover the archived fingerprint-to-timerange index,
 		// so blow it away and set ourselves dirty. Then re-open the now
 		// empty index.
+		// 如果时间戳索引无法建立，尝试清空并重新建立新索引
 		if err := index.DeleteFingerprintTimeRangeIndex(basePath); err != nil {
 			return nil, err
 		}
+		// TODO: 搞清楚为什么要置为dirty，或者换句话说，dirty起什么作用？
 		dirty = true
 		if archivedFingerprintToTimeRange, err = index.NewFingerprintTimeRangeIndex(basePath); err != nil {
 			return nil, err
@@ -233,16 +241,19 @@ func newPersistence(
 		archivedFingerprintToMetrics:   archivedFingerprintToMetrics,
 		archivedFingerprintToTimeRange: archivedFingerprintToTimeRange,
 
+		// 等待建立索引的metrics会加入到这个队列
 		indexingQueue:   make(chan indexingOp, indexingQueueCapacity),
 		indexingStopped: make(chan struct{}),
 		indexingFlush:   make(chan chan int),
 
+		// indexingQueue的长度，即正在等待被index的metrics的个数
 		indexingQueueLength: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "indexing_queue_length",
 			Help:      "The number of metrics waiting to be indexed.",
 		}),
+		// indexingQueue的总容量
 		indexingQueueCapacity: prometheus.MustNewConstMetric(
 			prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, subsystem, "indexing_queue_capacity"),
@@ -252,6 +263,7 @@ func newPersistence(
 			prometheus.GaugeValue,
 			float64(indexingQueueCapacity),
 		),
+		// 每个indexing批次的数量，即一次建立index的metrics个数
 		indexingBatchSizes: prometheus.NewSummary(
 			prometheus.SummaryOpts{
 				Namespace: namespace,
@@ -260,6 +272,7 @@ func newPersistence(
 				Help:      "Quantiles for indexing batch sizes (number of metrics per batch).",
 			},
 		),
+		// 批量index的时间间隔
 		indexingBatchDuration: prometheus.NewSummary(
 			prometheus.SummaryOpts{
 				Namespace: namespace,
@@ -268,12 +281,14 @@ func newPersistence(
 				Help:      "Quantiles for batch indexing duration in seconds.",
 			},
 		),
+		// 距离上一次checkpoint的时间间隔
 		checkpointLastDuration: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "checkpoint_last_duration_seconds",
 			Help:      "The duration in seconds it took to last checkpoint open chunks and chunks yet to be persisted.",
 		}),
+		// 为打开的chunks和未被持久化的chunks做checkpoint的时间间隔，注意这是一个Summary
 		checkpointDuration: prometheus.NewSummary(prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Subsystem:  subsystem,
@@ -281,12 +296,14 @@ func newPersistence(
 			Name:       "checkpoint_duration_seconds",
 			Help:       "The duration in seconds taken for checkpointing open chunks and chunks yet to be persisted",
 		}),
+		// 上一次做checkpoint操作时操作的数据块总字节数
 		checkpointLastSize: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "checkpoint_last_size_bytes",
 			Help:      "The size of the last checkpoint of open chunks and chunks yet to be persisted",
 		}),
+		// 在做checkpoint操作时每个序列写的chunk数量
 		checkpointChunksWritten: prometheus.NewSummary(prometheus.SummaryOpts{
 			Namespace:  namespace,
 			Subsystem:  subsystem,
@@ -294,24 +311,28 @@ func newPersistence(
 			Name:       "checkpoint_series_chunks_written",
 			Help:       "The number of chunk written per series while checkpointing open chunks and chunks yet to be persisted.",
 		}),
+		// 脏数据的计数，与local storage不一致的脏数据的数量
 		dirtyCounter: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "inconsistencies_total",
 			Help:      "A counter incremented each time an inconsistency in the local storage is detected. If this is greater zero, restart the server as soon as possible.",
 		}),
+		// 启动过程是否出现脏数据，由此会触发crash-recovery!
 		startedDirty: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "started_dirty",
 			Help:      "Whether the local storage was found to be dirty (and crash recovery occurred) during Prometheus startup.",
 		}),
+		// 当前是否在做checkpoint
 		checkpointing: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "checkpointing",
 			Help:      "1 if the storage is checkpointing, 0 otherwise.",
 		}),
+		// 针对每个序列已经持久化的chunk数量
 		seriesChunksPersisted: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
@@ -321,11 +342,15 @@ func newPersistence(
 			// chunks in 6 hours for a time series with 1s resolution.
 			Buckets: []float64{1, 2, 4, 8, 16, 32, 64, 128},
 		}),
+		// 是否处于脏状态的标志
 		dirty:          dirty,
 		pedanticChecks: pedanticChecks,
 		dirtyFileName:  dirtyPath,
 		fLock:          fLock,
-		shouldSync:     shouldSync,
+		// 即同步策略返回的flag
+		shouldSync: shouldSync,
+		// 最小重写比例，这个是为了控制在单个序列的文件尺寸过大时
+		// 避免重复多次的打开和重写，以提高性能
 		minShrinkRatio: minShrinkRatio,
 		// Create buffers of length 3*chunkLenWithHeader by default because that is still reasonably small
 		// and at the same time enough for many uses. The contract is to never return buffer smaller than
@@ -845,6 +870,7 @@ func (p *persistence) loadSeriesMapAndHeads() (sm *seriesMap, chunksToPersist in
 		if p.dirty {
 			log.Warn("Persistence layer appears dirty.")
 			p.startedDirty.Set(1)
+			// 启动过程是脏状态，开启crash-recovery!
 			err = p.recoverFromCrash(fingerprintToSeries)
 			if err != nil {
 				sm = nil

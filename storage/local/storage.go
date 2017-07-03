@@ -36,6 +36,19 @@ import (
 
 /*
 	TODO: fill out the glossary.
+	<chunk>
+	chunk是Prometheus local storage存放数据的单元, 它支持三种编码的格式，默认是第二种；
+	Prometheus会为每个序列设置一个文件来存放，chunk即是该文件里一个原子的数据块组成.
+
+	<head chunk>
+	head chunk即那些正在打开被访问的chunks数据.
+
+	<checkpoint>
+	类似于MySQL的checkpoint概念，为了保证数据未同步到磁盘之前的意外故障不至于造成内存里数据的
+	全部丢失，Prometheus会定期给未写入到磁盘的内存chunks实施checkpoint操作.
+
+	<FingerPrint>
+	它是一个metric的公制哈希的字符串，用来唯一标识一个metric！
 
 	术语表:
 	Create
@@ -55,6 +68,7 @@ import (
 	Throttling
 	Compaction
 	CrashRecovery
+	...
 */
 
 const (
@@ -81,6 +95,9 @@ const (
 	// This factor times -storage.local.memory-chunks is the number of
 	// memory chunks we tolerate before throttling the storage. It is also a
 	// basis for calculating the persistenceUrgencyScore.
+	// 容忍存放在内存里的chunks的比例，换句话说
+	// 当达到-storage.local.memory-chunks * toleranceFactorMemChunks值时
+	// prometheus的local storage会认为存放在内存里的数据量过大，可能需要做throttling.
 	toleranceFactorMemChunks = 1.1
 	// This factor times -storage.local.max-chunks-to-persist is the minimum
 	// required number of chunks waiting for persistence before the number
@@ -405,6 +422,11 @@ func NewMemorySeriesStorage(o *MemorySeriesStorageOptions) *MemorySeriesStorage 
 // Start implements Storage.
 func (s *MemorySeriesStorage) Start() (err error) {
 	var syncStrategy syncStrategy
+	// 数据同步策略的配置
+	// Prome的local storage在采集到数据后，首先会保存到内存里的chunks
+	// 而什么时候同步到磁盘，则是有下面这些同步策略的选择
+	// 默认为adaptive，即不会写完数据立即同步磁盘，而会利用操作系统的page cache来批量同步
+	// TODO: 解释Never和Always的行为.
 	switch s.options.SyncStrategy {
 	case Never:
 		syncStrategy = func() bool { return false }
@@ -419,6 +441,7 @@ func (s *MemorySeriesStorage) Start() (err error) {
 		panic("unknown sync strategy")
 	}
 
+	// persistence即是一个用来维护持久化工作的实例
 	var p *persistence
 	p, err = newPersistence(
 		s.options.PersistenceStoragePath,
@@ -441,6 +464,7 @@ func (s *MemorySeriesStorage) Start() (err error) {
 		}
 	}()
 
+	// 将建立好的索引和checkpoint保存下来的未持久化的chunk数据加载到内存里
 	log.Info("Loading series map and head chunks...")
 	s.fpToSeries, s.numChunksToPersist, err = p.loadSeriesMapAndHeads()
 	for _, series := range s.fpToSeries.m {
@@ -460,9 +484,17 @@ func (s *MemorySeriesStorage) Start() (err error) {
 		return err
 	}
 
+	// 定期地将"可以从内存里踢出的"chunks数据踢出内存
+	// 一个chunk会带上evictable的标签以表明它已经持久化到磁盘并且没有被查询.
 	go s.handleEvictList()
+	// 处理对不一致的异常数据的隔离，Prometheus会将这些数据放到orphan目录
+	// 并尽可能带上具体无法同步到数据目录的原因.
 	go s.handleQuarantine()
+	// 根据收到的信号量，对发生的throttling事件做记录，并输出相关的要持久化的chunks数量、
+	// 内存里现有chunks数量、危险打分等日志.
 	go s.logThrottling()
+	// 一个循环来做维护工作的goroutine
+	// 它会确定是否符合时机来做checkpoint并具体实施checkpoint等相关工作
 	go s.loop()
 
 	return nil

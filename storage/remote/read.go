@@ -58,6 +58,7 @@ func (r *Reader) ApplyConfig(conf *config.Config) error {
 
 // Queriers returns a list of Queriers for the currently configured
 // remote read endpoints.
+// 查询器会生成一堆的Querier对象用来完成具体的remote storage查询操作
 func (r *Reader) Queriers() []local.Querier {
 	r.mtx.Lock()
 	defer r.mtx.Unlock()

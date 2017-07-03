@@ -41,6 +41,7 @@ func localOnly(ctx context.Context) bool {
 }
 
 // Queryable is a local.Queryable that reads from local and remote storage.
+// 当执行查询操作时，Queryable对象会来跟踪对storage(local & remote)的查询
 type Queryable struct {
 	Local  promql.Queryable
 	Remote *remote.Reader
@@ -89,6 +90,9 @@ func (q querier) query(ctx context.Context, qFn func(q local.Querier) ([]local.S
 
 	fpToIt := map[model.Fingerprint]*mergeIterator{}
 
+	// 下面两个for循环分别对本地和远端的Iterator做合并，
+	// 以metric的fp为key
+	// 最终返回一个SeriesIterator数组
 	for _, it := range localIts {
 		fp := it.Metric().Metric.Fingerprint()
 		fpToIt[fp] = &mergeIterator{local: it}
@@ -208,6 +212,8 @@ func (mit mergeIterator) Close() {
 	}
 }
 
+// 这里根据Metric的Fingerprint做合并
+// 最终fpToIt的remote值会是一个iterator数组
 func mergeIterators(fpToIt map[model.Fingerprint]*mergeIterator, its []local.SeriesIterator) {
 	for _, it := range its {
 		fp := it.Metric().Metric.Fingerprint()

@@ -95,6 +95,7 @@ func (i *FingerprintMetricIndex) Lookup(fp model.Fingerprint) (metric model.Metr
 
 // NewFingerprintMetricIndex returns a LevelDB-backed FingerprintMetricIndex
 // ready to use.
+// 依托LevelDB实例化出来metric索引
 func NewFingerprintMetricIndex(basePath string) (*FingerprintMetricIndex, error) {
 	fingerprintToMetricDB, err := NewLevelDB(LevelDBOptions{
 		Path:           filepath.Join(basePath, FingerprintToMetricDir),
