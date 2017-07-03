@@ -190,6 +190,8 @@ type ruleLabelsAppender struct {
 	labels model.LabelSet
 }
 
+// ruleLabelsAppender实际上是SampleAppender的一个wrapper
+// 它会对Label做二次处理，然后再添加到实际的Appender
 func (app ruleLabelsAppender) Append(s *model.Sample) error {
 	for ln, lv := range app.labels {
 		if v, ok := s.Metric[ln]; ok && v != "" {

@@ -22,6 +22,8 @@ import (
 )
 
 // Writer allows queueing samples for remote writes.
+// remote storage的Appender实现，它会把数据添加到队列里
+// 然后统一由队列管理器管理对remote storage的数据传输工作
 type Writer struct {
 	mtx    sync.RWMutex
 	queues []*QueueManager

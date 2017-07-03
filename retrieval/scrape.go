@@ -300,6 +300,7 @@ const acceptHeader = `application/vnd.google.protobuf;proto=io.prometheus.client
 
 var userAgentHeader = fmt.Sprintf("Prometheus/%s", version.Version)
 
+// 目标的抓取数据方法，返回即Sample数组
 func (s *targetScraper) scrape(ctx context.Context, ts time.Time) (model.Samples, error) {
 	req, err := http.NewRequest("GET", s.URL().String(), nil)
 	if err != nil {
@@ -388,6 +389,8 @@ func newScrapeLoop(
 	return sl
 }
 
+// scrapeLoop的执行方法
+// 根据interval间隔时间抓取数据
 func (sl *scrapeLoop) run(interval, timeout time.Duration, errc chan<- error) {
 	defer close(sl.done)
 
@@ -538,7 +541,11 @@ func (sl *scrapeLoop) append(samples model.Samples) (int, error) {
 	return countingApp.count, nil
 }
 
+// 将采集到的Sample数组以及附加的时间戳等数据上报
+// 并上传一些额外的度量指标
 func (sl *scrapeLoop) report(start time.Time, duration time.Duration, scrapedSamples, postRelabelSamples int, err error) {
+	// 上报抓取状态，带上时间戳
+	// 这样一来就可以得出Target的最后一次抓取时间
 	sl.scraper.report(start, duration, err)
 
 	ts := model.TimeFromUnixNano(start.UnixNano())
@@ -577,6 +584,7 @@ func (sl *scrapeLoop) report(start time.Time, duration time.Duration, scrapedSam
 		Value:     model.SampleValue(postRelabelSamples),
 	}
 
+	// 通过Appender将Sample数据添加进去
 	reportAppender := ruleLabelsAppender{
 		SampleAppender: sl.appender,
 		labels:         sl.targetLabels,
